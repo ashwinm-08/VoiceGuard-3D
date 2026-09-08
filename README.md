@@ -3,11 +3,14 @@
 **Built for Team BharatMind | BUILD WITH भारत 2.0**
 
 [![Repository](https://img.shields.io/badge/GitHub-VoiceGuard--3D-181717?style=for-the-badge&logo=github)](https://github.com/ashwinm-08/VoiceGuard-3D)
+[![Live Demo](https://img.shields.io/badge/Vercel-voiceguard--3d.vercel.app-black?style=for-the-badge&logo=vercel)](https://voiceguard-3d.vercel.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Three.js](https://img.shields.io/badge/Three.js-WebGL%203D-000000?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
 [![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![Web Audio API](https://img.shields.io/badge/Web_Audio-Real--Time_Synthesizer-10B981?style=for-the-badge&logo=audio&logoColor=white)](#)
+
+> 🚀 **Live Demo on Vercel**: [https://voiceguard-3d.vercel.app](https://voiceguard-3d.vercel.app)
 
 ---
 
