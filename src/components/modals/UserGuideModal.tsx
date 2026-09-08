@@ -303,6 +303,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose 
                     { key: 'R', action: 'Toggle Audio Evidence Recording' },
                     { key: 'D', action: 'Toggle Dark / Light Mode' },
                     { key: 'F', action: 'Toggle Fullscreen Mode' },
+                    { key: 'A', action: 'Open BharatMind Mini AI Agent (Determines what you want)' },
                     { key: 'H', action: 'Open User Guide & Help Dialog' },
                     { key: 'Ctrl + ,', action: 'Open Settings & Preferences' },
                     { key: 'Esc', action: 'Close any active modal or menu' },

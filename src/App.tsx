@@ -18,6 +18,8 @@ import { SettingsModal } from './components/modals/SettingsModal';
 import { UserGuideModal } from './components/modals/UserGuideModal';
 import { KnowledgeQuestionsModal } from './components/modals/KnowledgeQuestionsModal';
 import { GamificationModal } from './components/modals/GamificationModal';
+import { BharatMindModal } from './components/modals/BharatMindModal';
+import { BharatMindInferenceResult } from './services/ai/BharatMindAgent';
 import { ContextMenu } from './components/modals/ContextMenu';
 import { AppSettings, CameraPreset, ContextMenuState, Visualization3DMode } from './types';
 import { audioSynth } from './services/audioSynth';
@@ -55,6 +57,7 @@ export const App: React.FC = () => {
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
   const [isKnowledgeOpen, setIsKnowledgeOpen] = useState<boolean>(false);
   const [isGamificationOpen, setIsGamificationOpen] = useState<boolean>(false);
+  const [isBharatMindOpen, setIsBharatMindOpen] = useState<boolean>(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     x: 0,
     y: 0,
@@ -150,6 +153,42 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleBharatMindAction = (action: BharatMindInferenceResult['suggestedAction']) => {
+    if (!action) return;
+    audioSynth.playClick();
+    switch (action.type) {
+      case 'trigger_challenge':
+        triggerChallenge(action.payload?.probeType || 'pitch-glide', action.payload?.difficulty || 'medium');
+        break;
+      case 'verdict_block':
+        submitVerdict('block', 95, action.payload?.reason || 'BharatMind Block Execution', true);
+        break;
+      case 'verdict_safe':
+        submitVerdict('safe', 85, action.payload?.reason || 'BharatMind Verified Human', false);
+        break;
+      case 'change_mode':
+        if (action.payload) setActive3DMode(action.payload);
+        break;
+      case 'inspect_metric':
+        if (action.payload) setActiveModalMetric(action.payload);
+        break;
+      case 'purge_privacy':
+        triggerInstantPurge();
+        break;
+      case 'open_knowledge':
+        setIsKnowledgeOpen(true);
+        break;
+      case 'switch_scenario':
+        if (action.payload) switchScenario(action.payload);
+        break;
+      case 'call_action':
+        if (action.payload === 'hold') toggleHold();
+        if (action.payload === 'mute') toggleMute();
+        if (action.payload === 'transfer') transferCall('Supervisor ID: AGT-992');
+        break;
+    }
+  };
+
   // Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -179,12 +218,14 @@ export const App: React.FC = () => {
         setIsGuideOpen(false);
         setIsKnowledgeOpen(false);
         setIsGamificationOpen(false);
+        setIsBharatMindOpen(false);
         setShowDisconnectModal(false);
         setContextMenu((prev) => ({ ...prev, visible: false }));
         return;
       }
 
       const keyLower = e.key.toLowerCase();
+      if (keyLower === 'a') { setIsBharatMindOpen((prev) => !prev); return; }
       if (keyLower === 'h') { setIsGuideOpen(true); return; }
       if (keyLower === 's') { submitVerdict('safe', 85, 'Shortcut: Safe', false); return; }
       if (keyLower === 'u') { submitVerdict('uncertain', 50, 'Shortcut: Uncertain', true); return; }
@@ -219,6 +260,7 @@ export const App: React.FC = () => {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenGuide={() => setIsGuideOpen(true)}
         onOpenGamification={() => setIsGamificationOpen(true)}
+        onOpenBharatMind={() => setIsBharatMindOpen(true)}
         onToggleFullscreen={toggleFullscreen}
       />
 
@@ -453,6 +495,13 @@ export const App: React.FC = () => {
           <Sliders className="w-4 h-4" />
           <span>Controls</span>
         </button>
+        <button
+          onClick={() => setIsBharatMindOpen(true)}
+          className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg text-emerald-400 bg-emerald-950/30 border border-emerald-500/30"
+        >
+          <Award className="w-4 h-4 text-cyan-300" />
+          <span>BharatMind</span>
+        </button>
       </nav>
 
       {/* MODALS */}
@@ -493,6 +542,17 @@ export const App: React.FC = () => {
       <GamificationModal
         isOpen={isGamificationOpen}
         onClose={() => setIsGamificationOpen(false)}
+      />
+
+      <BharatMindModal
+        isOpen={isBharatMindOpen}
+        onClose={() => setIsBharatMindOpen(false)}
+        metrics={currentMetrics}
+        caller={caller}
+        tts={ttsAnalysis}
+        sentiment={sentimentAnalysis}
+        coach={supervisorCoach}
+        onExecuteAction={handleBharatMindAction}
       />
 
       <ContextMenu

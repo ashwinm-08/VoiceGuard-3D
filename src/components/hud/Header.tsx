@@ -11,6 +11,7 @@ import {
   Settings,
   BookOpen,
   Trophy,
+  Bot,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -23,6 +24,7 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenGuide: () => void;
   onOpenGamification: () => void;
+  onOpenBharatMind?: () => void;
   onToggleFullscreen: () => void;
 }
 
@@ -35,6 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenGuide,
   onOpenGamification,
+  onOpenBharatMind,
   onToggleFullscreen,
 }) => {
   const formatDuration = (sec: number) => {
@@ -178,7 +181,18 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Action Icon Buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          {onOpenBharatMind && (
+            <button
+              onClick={onOpenBharatMind}
+              className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white text-xs font-bold font-mono flex items-center gap-1.5 shadow-md shadow-cyan-600/30 transition-all border border-cyan-400/40"
+              title="Open BharatMind Local Mini AI Agent (Determines what you want)"
+            >
+              <Bot className="w-4 h-4 text-cyan-200 animate-pulse" />
+              <span className="hidden sm:inline">BharatMind AI</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenGamification}
             className="p-2 rounded-lg bg-slate-900 border border-slate-700 text-amber-400 hover:text-amber-300 hover:bg-slate-800 transition-colors"

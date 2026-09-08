@@ -131,17 +131,23 @@ graph TB
 - **1.9 Time-Rewinding VR Timeline**: Interactive scrubber slider to rewind telemetry 60 seconds into the past to inspect exact threat moments.
 - **1.10 Sentiment & Emotion Indicator**: Real-time emotion classification, authenticity score, and simulated heart rate BPM.
 
-### 🤖 Section 2: Advanced AI/ML Features
-- **2.1 Real-Time Voice Clone Detection**: Identifies specific TTS engines (ElevenLabs v2.5, Amazon Polly, OpenAI, Bark/RVC) with confidence %.
-- **2.2 Behavioral Anomaly Detection**: Tracks deviation magnitude from customer's historical vocal baseline.
-- **2.3 Fraud Ring Detection (3D Call Network Graph)**: Identifies synchronized attacks, spoofed SIP trunk nodes, and coordinated fraud ringleaders.
-- **2.4 Adaptive Machine Learning Model**: Continuous learning from analyst verdicts with 94.3% accuracy tracking.
-- **2.5 Multi-Language Voice Analysis**: Identifies English, Hindi, Gujarati, Tamil, Telugu, and detects code-switching.
-- **2.6 Emotion Manipulation Detection**: Flags forced urgency scripts vs organic customer distress.
-- **2.7 Environmental Noise Classification**: Differentiates quiet domestic rooms, vehicle noise, and synthetic background reverb loops.
-- **2.8 Real-Time Transcription with Risk Highlighting**: Live STT dialogue stream with urgency language in orange and OTP/wire transfer keywords in red.
-- **2.9 Deepfake Audio Detection**: Detects vocoder spectral phase mismatches and diffusion artifacts.
-- **2.10 Caller Verification via Knowledge Questions**: Out-of-band 2FA questions challenge with instant verification.
+### 🧠 Section 2: Advanced AI/ML & BharatMind Neural Mini Agent
+- **2.1 BharatMind Mini AI Agent**:
+  - **Local Model Architecture**: Lightweight on-device softmax feature-embedding neural network (`BharatMind-Core-Neural-Mini-v2`).
+  - **Zero-Latency In-Memory Execution**: Evaluates user queries in `< 1ms` with zero external API calls or privacy compromises.
+  - **Natural Intent Classification**: Automatically deduces operator intents (e.g. *test the voice, block call, switch to DNA helix, inspect jitter, verify knowledge*) with `> 95%` confidence.
+  - **Intelligent Answers & Action Dispatch**: Explains acoustic reasoning and renders one-click actionable buttons that directly execute state changes, Web Audio probes, or call verdicts.
+  - **Operator Hotkey**: Press `A` on desktop or tap the header **BharatMind AI** button anytime.
+- **2.2 Real-Time Voice Clone Detection**: Identifies specific TTS engines (ElevenLabs v2.5, Amazon Polly, OpenAI, Bark/RVC) with confidence %.
+- **2.3 Behavioral Anomaly Detection**: Tracks deviation magnitude from customer's historical vocal baseline.
+- **2.4 Fraud Ring Detection (3D Call Network Graph)**: Identifies synchronized attacks, spoofed SIP trunk nodes, and coordinated fraud ringleaders.
+- **2.5 Adaptive Machine Learning Model**: Continuous learning from analyst verdicts with 94.3% accuracy tracking.
+- **2.6 Multi-Language Voice Analysis**: Identifies English, Hindi, Gujarati, Tamil, Telugu, and detects code-switching.
+- **2.7 Emotion Manipulation Detection**: Flags forced urgency scripts vs organic customer distress.
+- **2.8 Environmental Noise Classification**: Differentiates quiet domestic rooms, vehicle noise, and synthetic background reverb loops.
+- **2.9 Real-Time Transcription with Risk Highlighting**: Live STT dialogue stream with urgency language in orange and OTP/wire transfer keywords in red.
+- **2.10 Deepfake Audio Detection**: Detects vocoder spectral phase mismatches and diffusion artifacts.
+- **2.11 Caller Verification via Knowledge Questions**: Out-of-band 2FA questions challenge with instant verification.
 
 ### 💬 Section 3: Communication & Collaboration
 - **3.1 AI Supervisor Assistant (Real-Time Coach)**: Floating smart recommendations ("Elevated jitter - recommend acoustic probe", "High threat - block call").
@@ -186,6 +192,7 @@ graph TB
 | `R` | Toggle Audio Evidence Recording | Call View |
 | `D` | Toggle Dark / Light Theme | Global |
 | `F` | Toggle Fullscreen Mode | 3D Canvas |
+| `A` | Open BharatMind Mini AI Agent (Intent Reasoning Engine) | Global |
 | `H` | Open Built-In User Guide & Help | Global |
 | `Esc` | Close Active Modal / Menu | Global |
 | `Ctrl + ,` | Open Settings & Preferences | Global |
