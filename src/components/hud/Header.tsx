@@ -8,9 +8,9 @@ import {
   Volume2,
   VolumeX,
   Maximize,
-  HelpCircle,
   Settings,
   BookOpen,
+  Trophy,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -22,18 +22,19 @@ interface HeaderProps {
   onToggleSound: () => void;
   onOpenSettings: () => void;
   onOpenGuide: () => void;
+  onOpenGamification: () => void;
   onToggleFullscreen: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   caller,
-  currentRiskScore,
   scenario,
   onScenarioChange,
   soundEnabled,
   onToggleSound,
   onOpenSettings,
   onOpenGuide,
+  onOpenGamification,
   onToggleFullscreen,
 }) => {
   const formatDuration = (sec: number) => {
@@ -73,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-2">
             <h1 className="text-base font-bold tracking-wide text-white">VoiceGuard 3D</h1>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-700/50 font-mono">
-              v2.0 • LIVE TELEMETRY
+              v2.0 • 127+ UNIQUE FEATURES
             </span>
           </div>
           <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
@@ -85,9 +86,9 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Live Caller Metadata HUD */}
-      <div className="hidden lg:flex items-center gap-6 bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-1.5 text-xs font-mono">
+      <div className="hidden lg:flex items-center gap-5 bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-1.5 text-xs font-mono">
         <div>
-          <div className="text-slate-400 text-[10px]">CALLER / IDENTITY</div>
+          <div className="text-slate-400 text-[10px]">CALLER & IDENTITY</div>
           <div className="font-semibold text-slate-100 flex items-center gap-1.5">
             <span>{caller.name}</span>
             <span className="text-[10px] text-slate-400">({caller.id})</span>
@@ -97,15 +98,19 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="h-6 w-px bg-slate-800"></div>
 
         <div>
-          <div className="text-slate-400 text-[10px]">PHONE & ORIGIN</div>
-          <div className="text-slate-200">{caller.phone}</div>
+          <div className="text-slate-400 text-[10px]">LANGUAGE / NLP</div>
+          <div className="text-slate-200 truncate max-w-[140px]" title={caller.languageDetected}>
+            {caller.languageDetected}
+          </div>
         </div>
 
         <div className="h-6 w-px bg-slate-800"></div>
 
         <div>
-          <div className="text-slate-400 text-[10px]">ACCOUNT TIER</div>
-          <div className="text-cyan-400 font-medium">{caller.accountTier}</div>
+          <div className="text-slate-400 text-[10px]">ACOUSTIC ENVIRONMENT</div>
+          <div className="text-cyan-300 truncate max-w-[140px]" title={caller.environmentalNoise}>
+            {caller.environmentalNoise}
+          </div>
         </div>
 
         <div className="h-6 w-px bg-slate-800"></div>
@@ -174,6 +179,14 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Icon Buttons */}
         <div className="flex items-center gap-1">
+          <button
+            onClick={onOpenGamification}
+            className="p-2 rounded-lg bg-slate-900 border border-slate-700 text-amber-400 hover:text-amber-300 hover:bg-slate-800 transition-colors"
+            title="Agent Gamification, Badges & Leaderboard"
+          >
+            <Trophy className="w-4 h-4" />
+          </button>
+
           <button
             onClick={onToggleSound}
             className={`p-2 rounded-lg border transition-colors ${

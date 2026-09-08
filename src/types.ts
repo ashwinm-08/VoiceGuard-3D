@@ -1,5 +1,12 @@
 export type ThreatLevel = 'safe' | 'low' | 'medium' | 'high' | 'critical';
 
+export type Visualization3DMode = 
+  | 'biometrics' 
+  | 'dna-helix' 
+  | 'frequency-tower' 
+  | 'neural-network' 
+  | 'fraud-ring';
+
 export interface MetricHistoryPoint {
   time: number; // seconds relative to start
   timestamp: string;
@@ -13,6 +20,9 @@ export interface MetricHistoryPoint {
   formantStability: number; // 0 - 1
   couplingScore: number; // 0 - 1
   riskScore: number; // 0 - 100
+  // Predictive trending
+  predictedRiskIn10s: number;
+  trendDirection: 'up' | 'stable' | 'down';
 }
 
 export type ScenarioType = 'safe' | 'borderline' | 'deepfake';
@@ -29,6 +39,8 @@ export interface CallerInfo {
   status: 'active' | 'on_hold' | 'disconnected' | 'transferred';
   isRecording: boolean;
   isMuted: boolean;
+  languageDetected: string;
+  environmentalNoise: string; // 'Office Environment', 'Car Acoustics', 'Synthetic Reverb', etc.
 }
 
 export type ChallengeType = 
@@ -61,6 +73,52 @@ export interface VerdictSubmission {
   flaggedForReview: boolean;
   callerId: string;
   riskScoreAtVerdict: number;
+}
+
+export interface TTSEngineAnalysis {
+  isClone: boolean;
+  detectedEngine: string; // 'ElevenLabs Voice Engine v2', 'Amazon Polly Neural', etc.
+  engineConfidence: number; // 0 - 100
+  modelVersionAge: string; // 'Released Q4 2024'
+  targetMatch: string; // 'Impersonation of Rajesh Sharma voice sample'
+  artifactsDetected: string[];
+}
+
+export interface SentimentAnalysis {
+  emotion: string; // 'Calm / Composed', 'Agitated / Stressed', 'Emotionally Manipulative'
+  authenticityScore: number; // 0 - 100
+  heartRateBpm: number;
+  stressLevel: 'low' | 'moderate' | 'high';
+  isManipulative: boolean;
+}
+
+export interface TranscriptKeyword {
+  word: string;
+  severity: 'red' | 'orange' | 'yellow';
+}
+
+export interface TranscriptLine {
+  id: string;
+  timestamp: string;
+  speaker: 'Caller' | 'Agent' | 'AI-Coach';
+  text: string;
+  keywords: TranscriptKeyword[];
+}
+
+export interface AISupervisorCoach {
+  recommendation: string;
+  severity: 'safe' | 'warning' | 'alert';
+  confidence: number;
+  reason: string;
+}
+
+export interface SecurityQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  category: 'Banking' | 'Identity' | 'Recent Transaction';
+  difficulty: 'easy' | 'medium' | 'hard';
 }
 
 export interface AppSettings {

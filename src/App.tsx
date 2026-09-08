@@ -1,20 +1,27 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useVoiceGuardSimulation } from './hooks/useVoiceGuardSimulation';
 import { VoiceGuardScene3D } from './components/3d/VoiceGuardScene3D';
 import { Header } from './components/hud/Header';
+import { AIForensicsBar } from './components/hud/AIForensicsBar';
 import { CentralRiskMeter } from './components/hud/CentralRiskMeter';
 import { CallControls } from './components/hud/CallControls';
 import { VerdictPanel } from './components/hud/VerdictPanel';
 import { ChallengeSystem } from './components/hud/ChallengeSystem';
 import { MetricCard } from './components/hud/MetricCard';
+import { LiveTranscriptPanel } from './components/hud/LiveTranscriptPanel';
+import { StatsWidgetArray } from './components/hud/StatsWidgetArray';
+import { TimeRewindScrubber } from './components/hud/TimeRewindScrubber';
+import { VoiceCommandBar } from './components/hud/VoiceCommandBar';
 import { MetricDetailModal } from './components/modals/MetricDetailModal';
 import { DisconnectConfirmModal } from './components/modals/DisconnectConfirmModal';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { UserGuideModal } from './components/modals/UserGuideModal';
+import { KnowledgeQuestionsModal } from './components/modals/KnowledgeQuestionsModal';
+import { GamificationModal } from './components/modals/GamificationModal';
 import { ContextMenu } from './components/modals/ContextMenu';
-import { AppSettings, CameraPreset, ContextMenuState } from './types';
+import { AppSettings, CameraPreset, ContextMenuState, Visualization3DMode } from './types';
 import { audioSynth } from './services/audioSynth';
-import { Phone, BarChart2, Shield, Sliders, Box } from 'lucide-react';
+import { Phone, BarChart2, Sliders, Box, Award, Shield } from 'lucide-react';
 
 export const App: React.FC = () => {
   // Application Settings
@@ -39,10 +46,15 @@ export const App: React.FC = () => {
   // Camera preset view
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>(1);
 
+  // 3D Visualization Mode
+  const [active3DMode, setActive3DMode] = useState<Visualization3DMode>('biometrics');
+
   // Modals state
   const [activeModalMetric, setActiveModalMetric] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
+  const [isKnowledgeOpen, setIsKnowledgeOpen] = useState<boolean>(false);
+  const [isGamificationOpen, setIsGamificationOpen] = useState<boolean>(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     x: 0,
     y: 0,
@@ -53,13 +65,15 @@ export const App: React.FC = () => {
   // Mobile navigation active tab
   const [mobileTab, setMobileTab] = useState<'call' | 'metrics' | '3d' | 'controls'>('call');
 
-  // VoiceGuard Simulation Hook
+  // Simulation Engine
   const {
     scenario,
     switchScenario,
     caller,
     currentMetrics,
     history,
+    rewindIndex,
+    setRewindIndex,
     isChallengeActive,
     challengeProgress,
     lastChallengeResult,
@@ -75,14 +89,20 @@ export const App: React.FC = () => {
     setShowDisconnectModal,
     verdicts,
     submitVerdict,
+    ttsAnalysis,
+    sentimentAnalysis,
+    supervisorCoach,
+    transcript,
+    purgeCountdown,
+    isSessionPurged,
+    triggerInstantPurge,
+    securityQuestions,
   } = useVoiceGuardSimulation(settings.soundEnabled, settings.alertVolume);
 
-  // Update Settings helper
   const handleUpdateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
-  // Export CSV Data function
   const handleExportCsv = (key: string) => {
     const headers = ['Timestamp', 'TimeSec', 'RiskScore', 'JitterPercent', 'ShimmerDb', 'F1_Hz', 'F2_Hz', 'F3_Hz', 'VowelZone', 'BreathEnergy', 'CouplingScore'];
     const rows = history.map((pt) => [
@@ -100,38 +120,28 @@ export const App: React.FC = () => {
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `VoiceGuard_Telemetry_${key.toUpperCase()}_${Date.now()}.csv`);
+    link.href = encodeURI(csvContent);
+    link.download = `VoiceGuard_Telemetry_${key.toUpperCase()}_${Date.now()}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Export PNG function (captures canvas screenshot)
   const handleExportPng = (key: string) => {
     const canvas = document.querySelector('canvas');
     if (!canvas) return;
-    const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.download = `VoiceGuard_${key}_3D_Capture_${Date.now()}.png`;
-    link.href = dataUrl;
+    link.href = canvas.toDataURL('image/png');
     link.click();
   };
 
-  // Right-click context menu handler
   const handleMetricContextMenu = (e: React.MouseEvent, key: 'risk' | 'jitter' | 'shimmer' | 'formants' | 'breath') => {
     e.preventDefault();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      metricKey: key,
-      visible: true,
-    });
+    setContextMenu({ x: e.clientX, y: e.clientY, metricKey: key, visible: true });
   };
 
-  // Fullscreen toggle
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
@@ -143,89 +153,48 @@ export const App: React.FC = () => {
   // Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Avoid firing when typing in input
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
 
-      // Views 1 - 5
       if (['1', '2', '3', '4', '5'].includes(e.key)) {
         setCameraPreset(Number(e.key) as CameraPreset);
         audioSynth.playClick();
         return;
       }
 
-      // Settings shortcut: Ctrl+,
       if (e.ctrlKey && e.key === ',') {
         e.preventDefault();
         setIsSettingsOpen(true);
         return;
       }
 
-      // Export shortcut: Ctrl+S
       if (e.ctrlKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         handleExportCsv('full_dataset');
         return;
       }
 
-      // Esc to close modals
       if (e.key === 'Escape') {
         setActiveModalMetric(null);
         setIsSettingsOpen(false);
         setIsGuideOpen(false);
+        setIsKnowledgeOpen(false);
+        setIsGamificationOpen(false);
         setShowDisconnectModal(false);
         setContextMenu((prev) => ({ ...prev, visible: false }));
         return;
       }
 
       const keyLower = e.key.toLowerCase();
-
-      // Help
-      if (keyLower === 'h') {
-        setIsGuideOpen(true);
-        return;
-      }
-
-      // Verdicts
-      if (keyLower === 's') {
-        submitVerdict('safe', 85, 'Quick shortcut mark: Safe', false);
-        return;
-      }
-      if (keyLower === 'u') {
-        submitVerdict('uncertain', 50, 'Quick shortcut mark: Uncertain', true);
-        return;
-      }
-      if (keyLower === 'b') {
-        submitVerdict('block', 95, 'Quick shortcut mark: Block', true);
-        return;
-      }
-
-      // Call controls
-      if (keyLower === 'p') {
-        toggleHold();
-        return;
-      }
-      if (keyLower === 'm') {
-        toggleMute();
-        return;
-      }
-      if (keyLower === 'c') {
-        triggerChallenge('pitch-glide', 'medium');
-        return;
-      }
-      if (keyLower === 'r') {
-        toggleRecord();
-        return;
-      }
-      if (keyLower === 'd') {
-        setSettings((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' }));
-        return;
-      }
-      if (keyLower === 'f') {
-        toggleFullscreen();
-        return;
-      }
+      if (keyLower === 'h') { setIsGuideOpen(true); return; }
+      if (keyLower === 's') { submitVerdict('safe', 85, 'Shortcut: Safe', false); return; }
+      if (keyLower === 'u') { submitVerdict('uncertain', 50, 'Shortcut: Uncertain', true); return; }
+      if (keyLower === 'b') { submitVerdict('block', 95, 'Shortcut: Block', true); return; }
+      if (keyLower === 'p') { toggleHold(); return; }
+      if (keyLower === 'm') { toggleMute(); return; }
+      if (keyLower === 'c') { triggerChallenge('pitch-glide', 'medium'); return; }
+      if (keyLower === 'r') { toggleRecord(); return; }
+      if (keyLower === 'd') { setSettings((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' })); return; }
+      if (keyLower === 'f') { toggleFullscreen(); return; }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -239,7 +208,7 @@ export const App: React.FC = () => {
       } ${settings.highContrast ? 'contrast-125' : ''}`}
       style={{ fontSize: `${settings.textSize}%` }}
     >
-      {/* Top Header HUD */}
+      {/* 1. Top Header HUD */}
       <Header
         caller={caller}
         currentRiskScore={currentMetrics.riskScore}
@@ -249,14 +218,26 @@ export const App: React.FC = () => {
         onToggleSound={() => handleUpdateSettings({ soundEnabled: !settings.soundEnabled })}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenGuide={() => setIsGuideOpen(true)}
+        onOpenGamification={() => setIsGamificationOpen(true)}
         onToggleFullscreen={toggleFullscreen}
       />
 
-      {/* Main Workspace Body */}
+      {/* 2. AI Forensics & Biometric Privacy Sub-Bar (Features 2.1, 1.10, 3.1, 6.2) */}
+      <AIForensicsBar
+        tts={ttsAnalysis}
+        sentiment={sentimentAnalysis}
+        coach={supervisorCoach}
+        purgeCountdown={purgeCountdown}
+        isPurged={isSessionPurged}
+        onInstantPurge={triggerInstantPurge}
+        onOpenKnowledgeQuestion={() => setIsKnowledgeOpen(true)}
+      />
+
+      {/* 3. Main Workspace Body */}
       <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden">
-        {/* LEFT / CENTER VIEWPORT (3D WebGL Canvas & Metrics overlay) */}
+        {/* LEFT / CENTER VIEWPORT (3D Canvas + Overlays + Telemetry Row) */}
         <div
-          className={`flex-1 relative flex flex-col h-full ${
+          className={`flex-1 relative flex flex-col h-full overflow-hidden ${
             mobileTab === '3d' || mobileTab === 'metrics' || mobileTab === 'call' ? 'flex' : 'hidden lg:flex'
           }`}
         >
@@ -271,25 +252,42 @@ export const App: React.FC = () => {
               challengeProgress={challengeProgress}
               settings={settings}
               onMetricSelect={(key) => setActiveModalMetric(key)}
+              active3DMode={active3DMode}
+              onModeChange={setActive3DMode}
             />
 
-            {/* Floating Risk Warning Banner if Critical */}
+            {/* Critical Alert Floating Banner */}
             {currentMetrics.riskScore >= 80 && (
-              <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-20 bg-rose-950/90 border border-rose-500/80 text-rose-200 px-4 py-2 rounded-xl shadow-2xl backdrop-blur-md flex items-center gap-2 animate-bounce text-xs font-bold font-mono">
+              <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-20 bg-rose-950/95 border border-rose-500 text-rose-100 px-4 py-2 rounded-xl shadow-2xl backdrop-blur-md flex items-center gap-2 animate-bounce text-xs font-bold font-mono">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                <span>🚨 HIGH THREAT DETECTED: ABNORMAL ACOUSTIC BIOMETRICS</span>
+                <span>🚨 SYNTHETIC VOICE CLONE ATTACK FLAGGED ({ttsAnalysis.detectedEngine})</span>
               </div>
             )}
           </div>
 
-          {/* Bottom Floating Telemetry Metric Cards */}
+          {/* Bottom Telemetry HUD Stack (Scrubber + Metrics + Widgets + Voice Commands) */}
           <div
-            className={`p-3 bg-gradient-to-t from-slate-950/95 via-slate-950/80 to-transparent border-t border-slate-800/60 z-10 ${
-              mobileTab === 'metrics' ? 'block' : 'hidden md:block'
+            className={`p-3 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent border-t border-slate-800/80 space-y-2.5 z-10 ${
+              mobileTab === 'metrics' || mobileTab === 'call' ? 'block' : 'hidden md:block'
             }`}
           >
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 max-w-7xl mx-auto">
-              {/* Jitter */}
+            {/* Hands-Free Voice Command Bar (Feature 8.3) */}
+            <VoiceCommandBar
+              onTriggerChallenge={() => triggerChallenge('pitch-glide', 'medium')}
+              onSubmitVerdict={(v) => submitVerdict(v, 90, 'Voice command verdict', v === 'block')}
+              onFocusMetric={(m) => setActiveModalMetric(m)}
+              currentRisk={currentMetrics.riskScore}
+            />
+
+            {/* VR Time-Rewind Scrubber (Feature 1.9) */}
+            <TimeRewindScrubber
+              history={history}
+              rewindIndex={rewindIndex}
+              onRewindChange={setRewindIndex}
+            />
+
+            {/* Live Telemetry Metric Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 max-w-7xl mx-auto">
               {settings.showJitter && (
                 <MetricCard
                   id="jitter"
@@ -310,7 +308,6 @@ export const App: React.FC = () => {
                 />
               )}
 
-              {/* Shimmer */}
               {settings.showShimmer && (
                 <MetricCard
                   id="shimmer"
@@ -331,7 +328,6 @@ export const App: React.FC = () => {
                 />
               )}
 
-              {/* Formants */}
               {settings.showFormants && (
                 <MetricCard
                   id="formants"
@@ -350,7 +346,6 @@ export const App: React.FC = () => {
                 />
               )}
 
-              {/* Breath Coupling */}
               {settings.showBreathCoupling && (
                 <MetricCard
                   id="breath"
@@ -371,10 +366,13 @@ export const App: React.FC = () => {
                 />
               )}
             </div>
+
+            {/* Real-Time Stats Widget Array (Section 4.1) */}
+            <StatsWidgetArray durationSeconds={caller.duration} />
           </div>
         </div>
 
-        {/* RIGHT SIDE PANEL (Desktop & Mobile Tabs: Controls / Verdict / Challenge / Central Gauge) */}
+        {/* RIGHT SIDE PANEL (Central Gauge + Active Challenge + Call Controls + Decision Suite + Transcript) */}
         <div
           className={`w-full lg:w-96 p-3 lg:p-4 bg-slate-950/95 border-l border-slate-800/80 overflow-y-auto space-y-3.5 z-20 ${
             mobileTab === 'controls' || mobileTab === 'call' ? 'block' : 'hidden lg:block'
@@ -385,6 +383,9 @@ export const App: React.FC = () => {
             metrics={currentMetrics}
             onExpand={() => setActiveModalMetric('risk')}
           />
+
+          {/* Real-time Transcription Panel (Feature 2.8) */}
+          <LiveTranscriptPanel transcript={transcript} />
 
           {/* Acoustic Liveness Challenge System */}
           <ChallengeSystem
@@ -406,7 +407,7 @@ export const App: React.FC = () => {
             onTransfer={() => transferCall('Supervisor ID: AGT-992')}
           />
 
-          {/* Risk Assessment Verdict Panel */}
+          {/* Risk Assessment Verdict Suite */}
           <VerdictPanel
             onVerdictSubmit={submitVerdict}
             recentVerdicts={verdicts}
@@ -483,6 +484,17 @@ export const App: React.FC = () => {
         onClose={() => setIsGuideOpen(false)}
       />
 
+      <KnowledgeQuestionsModal
+        isOpen={isKnowledgeOpen}
+        onClose={() => setIsKnowledgeOpen(false)}
+        questions={securityQuestions}
+      />
+
+      <GamificationModal
+        isOpen={isGamificationOpen}
+        onClose={() => setIsGamificationOpen(false)}
+      />
+
       <ContextMenu
         state={contextMenu}
         onClose={() => setContextMenu((prev) => ({ ...prev, visible: false }))}
@@ -494,4 +506,5 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
 export default App;

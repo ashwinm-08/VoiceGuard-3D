@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { MetricHistoryPoint, CameraPreset, AppSettings } from '../../types';
+import { MetricHistoryPoint, CameraPreset, AppSettings, Visualization3DMode } from '../../types';
 import { audioSynth } from '../../services/audioSynth';
+import { Dna, BarChart3, Share2, Network, Shield, Eye } from 'lucide-react';
 
 interface VoiceGuardScene3DProps {
   currentMetrics: MetricHistoryPoint;
@@ -10,9 +11,11 @@ interface VoiceGuardScene3DProps {
   cameraPreset: CameraPreset;
   onPresetChange: (preset: CameraPreset) => void;
   isChallengeActive: boolean;
-  challengeProgress: number; // 0 to 1
+  challengeProgress: number;
   settings: AppSettings;
   onMetricSelect?: (metricKey: string) => void;
+  active3DMode: Visualization3DMode;
+  onModeChange: (mode: Visualization3DMode) => void;
 }
 
 export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
@@ -24,6 +27,8 @@ export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
   challengeProgress,
   settings,
   onMetricSelect,
+  active3DMode,
+  onModeChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -31,7 +36,14 @@ export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
 
-  // References to dynamic 3D meshes
+  // Group references for multi-mode 3D rendering
+  const biometricsGroupRef = useRef<THREE.Group | null>(null);
+  const dnaHelixGroupRef = useRef<THREE.Group | null>(null);
+  const freqTowerGroupRef = useRef<THREE.Group | null>(null);
+  const fraudRingGroupRef = useRef<THREE.Group | null>(null);
+  const neuralNetGroupRef = useRef<THREE.Group | null>(null);
+
+  // Dynamic mesh references
   const riskCoreRef = useRef<THREE.Mesh | null>(null);
   const outerRing1Ref = useRef<THREE.Mesh | null>(null);
   const outerRing2Ref = useRef<THREE.Mesh | null>(null);
@@ -40,8 +52,8 @@ export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
   const formantPointsRef = useRef<THREE.Points | null>(null);
   const shockwaveRef = useRef<THREE.Mesh | null>(null);
   const couplingRingsRef = useRef<THREE.Group | null>(null);
-  const raycasterRef = useRef(new THREE.Raycaster());
-  const mousePosRef = useRef(new THREE.Vector2());
+  const threatDomeRef = useRef<THREE.Mesh | null>(null);
+  const ripplesGroupRef = useRef<THREE.Group | null>(null);
 
   const [hoveredInfo, setHoveredInfo] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -52,38 +64,47 @@ export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
 
   // Determine risk color
   const getRiskColor = (score: number) => {
-    if (score <= 20) return new THREE.Color(0x00f0ff); // Cyan
-    if (score <= 40) return new THREE.Color(0x10b981); // Green
-    if (score <= 60) return new THREE.Color(0xfacc15); // Yellow
-    if (score <= 80) return new THREE.Color(0xf97316); // Orange
-    return new THREE.Color(0xef4444); // Red
+    if (score <= 20) return new THREE.Color(0x00f0ff);
+    if (score <= 40) return new THREE.Color(0x10b981);
+    if (score <= 60) return new THREE.Color(0xfacc15);
+    if (score <= 80) return new THREE.Color(0xf97316);
+    return new THREE.Color(0xef4444);
   };
 
-  // Update camera preset targets
+  // Camera preset positions
   useEffect(() => {
     switch (cameraPreset) {
-      case 1: // Front view (default)
+      case 1:
         targetCameraPos.current.set(0, 1.8, 11);
         targetLookAt.current.set(0, 0, 0);
         break;
-      case 2: // Top view (metrics overview)
+      case 2:
         targetCameraPos.current.set(0, 14, 0.1);
         targetLookAt.current.set(0, 0, 0);
         break;
-      case 3: // Side view (timeline view)
+      case 3:
         targetCameraPos.current.set(12, 1, 0);
         targetLookAt.current.set(0, 0, 0);
         break;
-      case 4: // Free look (isometric exploration)
+      case 4:
         targetCameraPos.current.set(8, 7, 8);
         targetLookAt.current.set(0, 0, 0);
         break;
-      case 5: // Call focus (zoomed in)
+      case 5:
         targetCameraPos.current.set(0, 0.5, 4.8);
         targetLookAt.current.set(0, 0, 0);
         break;
     }
   }, [cameraPreset]);
+
+  // Mode visibility switcher
+  useEffect(() => {
+    if (biometricsGroupRef.current) biometricsGroupRef.current.visible = active3DMode === 'biometrics';
+    if (dnaHelixGroupRef.current) dnaHelixGroupRef.current.visible = active3DMode === 'dna-helix';
+    if (freqTowerGroupRef.current) freqTowerGroupRef.current.visible = active3DMode === 'frequency-tower';
+    if (fraudRingGroupRef.current) fraudRingGroupRef.current.visible = active3DMode === 'fraud-ring';
+    if (neuralNetGroupRef.current) neuralNetGroupRef.current.visible = active3DMode === 'neural-network';
+  }, [active3DMode]);
 
   // Initial Scene Setup
   useEffect(() => {
@@ -93,297 +114,358 @@ export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(settings.theme === 'light' ? 0xf1f5f9 : 0x070c14);
-    scene.fog = new THREE.FogExp2(settings.theme === 'light' ? 0xf1f5f9 : 0x070c14, 0.035);
+    scene.background = new THREE.Color(settings.theme === 'light' ? 0xf1f5f9 : 0x050914);
+    scene.fog = new THREE.FogExp2(settings.theme === 'light' ? 0xf1f5f9 : 0x050914, 0.035);
     sceneRef.current = scene;
 
-    // Camera
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(0, 1.8, 11);
     cameraRef.current = camera;
 
-    // Renderer
-    const pixelRatio = settings.quality3D === 'high' ? Math.min(window.devicePixelRatio, 2) : settings.quality3D === 'medium' ? 1.5 : 1;
+    const pixelRatio = settings.quality3D === 'high' ? Math.min(window.devicePixelRatio, 2) : 1.2;
     const renderer = new THREE.WebGLRenderer({ antialias: settings.quality3D !== 'low', alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
     renderer.setPixelRatio(pixelRatio);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.toneMappingExposure = 1.25;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // OrbitControls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxDistance = 24;
-    controls.minDistance = 2.5;
+    controls.maxDistance = 26;
+    controls.minDistance = 2.2;
     controls.target.set(0, 0, 0);
     controlsRef.current = controls;
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
 
-    const dirLight1 = new THREE.DirectionalLight(0x00f0ff, 1.8);
-    dirLight1.position.set(5, 10, 7);
+    const dirLight1 = new THREE.DirectionalLight(0x00f0ff, 2.0);
+    dirLight1.position.set(6, 12, 8);
     scene.add(dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0xef4444, 1.2);
-    dirLight2.position.set(-5, -5, -5);
+    const dirLight2 = new THREE.DirectionalLight(0xef4444, 1.4);
+    dirLight2.position.set(-6, -6, -6);
     scene.add(dirLight2);
 
-    const pointLight = new THREE.PointLight(0x10b981, 2, 15);
-    pointLight.position.set(0, 0, 0);
-    scene.add(pointLight);
-
-    // --- 1. Grid & Spatial Reference ---
-    const gridHelper = new THREE.GridHelper(20, 20, 0x1e293b, 0x0f172a);
+    // Spatial Ground Grid
+    const gridHelper = new THREE.GridHelper(24, 24, 0x1e293b, 0x0f172a);
     gridHelper.position.y = -2.8;
     scene.add(gridHelper);
 
-    // --- 2. Central Risk Hologram Group ---
-    const riskGroup = new THREE.Group();
-    riskGroup.name = 'riskGroup';
+    // --- 360° Threat Analysis Dome (Feature 1.6) ---
+    const domeGeo = new THREE.SphereGeometry(12, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+    const domeMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.BackSide,
+    });
+    const threatDome = new THREE.Mesh(domeGeo, domeMat);
+    scene.add(threatDome);
+    threatDomeRef.current = threatDome;
 
-    // Core sphere (pulsing)
-    const coreGeo = new THREE.SphereGeometry(1.0, 32, 32);
+    // --- Animated Risk Ripples Group (Feature 1.3) ---
+    const ripplesGroup = new THREE.Group();
+    for (let r = 0; r < 4; r++) {
+      const ringGeo = new THREE.RingGeometry(0.8 + r * 1.5, 0.85 + r * 1.5, 48);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x00f0ff,
+        transparent: true,
+        opacity: 0.25 - r * 0.05,
+        side: THREE.DoubleSide,
+      });
+      const rMesh = new THREE.Mesh(ringGeo, ringMat);
+      rMesh.rotation.x = Math.PI / 2;
+      rMesh.position.y = -2.75;
+      ripplesGroup.add(rMesh);
+    }
+    scene.add(ripplesGroup);
+    ripplesGroupRef.current = ripplesGroup;
+
+    // ==========================================
+    // MODE 1: VOCAL BIOMETRICS (Default)
+    // ==========================================
+    const bioGroup = new THREE.Group();
+    bioGroup.name = 'biometricsGroup';
+
+    // Central Core Orb & Rings
+    const coreGeo = new THREE.SphereGeometry(1.05, 32, 32);
     const coreMat = new THREE.MeshStandardMaterial({
       color: 0x00f0ff,
       emissive: 0x00a8b8,
       emissiveIntensity: 0.8,
       roughness: 0.2,
-      metalness: 0.8,
+      metalness: 0.85,
       wireframe: true,
     });
     const riskCore = new THREE.Mesh(coreGeo, coreMat);
-    riskGroup.add(riskCore);
+    riskCore.name = 'riskCore';
+    bioGroup.add(riskCore);
     riskCoreRef.current = riskCore;
 
-    // Inner glowing sphere
-    const innerGlowGeo = new THREE.SphereGeometry(0.75, 24, 24);
-    const innerGlowMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
-      transparent: true,
-      opacity: 0.4,
-    });
-    const innerGlow = new THREE.Mesh(innerGlowGeo, innerGlowMat);
-    riskGroup.add(innerGlow);
-
-    // Outer Torus Ring 1
-    const ring1Geo = new THREE.TorusGeometry(1.8, 0.03, 16, 100);
-    const ring1Mat = new THREE.MeshStandardMaterial({
-      color: 0x00f0ff,
-      emissive: 0x00f0ff,
-      emissiveIntensity: 0.5,
-      roughness: 0.3,
-    });
+    const ring1Geo = new THREE.TorusGeometry(1.85, 0.035, 16, 100);
+    const ring1Mat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 0.5 });
     const outerRing1 = new THREE.Mesh(ring1Geo, ring1Mat);
     outerRing1.rotation.x = Math.PI / 2.5;
-    riskGroup.add(outerRing1);
+    bioGroup.add(outerRing1);
     outerRing1Ref.current = outerRing1;
 
-    // Outer Torus Ring 2
-    const ring2Geo = new THREE.TorusGeometry(2.3, 0.03, 16, 100);
-    const ring2Mat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      emissive: 0x0284c7,
-      emissiveIntensity: 0.4,
-      roughness: 0.4,
-    });
+    const ring2Geo = new THREE.TorusGeometry(2.35, 0.035, 16, 100);
+    const ring2Mat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.4 });
     const outerRing2 = new THREE.Mesh(ring2Geo, ring2Mat);
     outerRing2.rotation.y = Math.PI / 3;
-    riskGroup.add(outerRing2);
+    bioGroup.add(outerRing2);
     outerRing2Ref.current = outerRing2;
 
-    scene.add(riskGroup);
-
-    // --- 3. Jitter 3D Waveform Ribbon ---
+    // Jitter 3D Ribbon
     const jitterGeo = new THREE.BufferGeometry();
-    const jitterPointsCount = 60;
-    const jitterPositions = new Float32Array(jitterPointsCount * 3);
-    for (let i = 0; i < jitterPointsCount; i++) {
-      const t = (i / jitterPointsCount) * 10 - 5; // -5 to +5 on X
-      jitterPositions[i * 3] = t;
+    const jitterPtsCount = 60;
+    const jitterPositions = new Float32Array(jitterPtsCount * 3);
+    for (let i = 0; i < jitterPtsCount; i++) {
+      jitterPositions[i * 3] = (i / jitterPtsCount) * 10 - 5;
       jitterPositions[i * 3 + 1] = -1.8;
       jitterPositions[i * 3 + 2] = 2.0;
     }
     jitterGeo.setAttribute('position', new THREE.BufferAttribute(jitterPositions, 3));
-    const jitterMat = new THREE.LineBasicMaterial({
-      color: 0x10b981,
-      linewidth: 3,
-    });
+    const jitterMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 3 });
     const jitterLine = new THREE.Line(jitterGeo, jitterMat);
     jitterLine.name = 'jitterLine';
-    scene.add(jitterLine);
+    bioGroup.add(jitterLine);
     jitterLineRef.current = jitterLine;
 
-    // Threshold plane for Jitter (Red threshold >3.5%)
-    const threshGeo = new THREE.BufferGeometry();
-    threshGeo.setAttribute('position', new THREE.Float32BufferAttribute([
-      -5, -1.8 + 1.2, 2.0,
-      5, -1.8 + 1.2, 2.0
-    ], 3));
-    const threshMat = new THREE.LineDashedMaterial({
-      color: 0xef4444,
-      dashSize: 0.2,
-      gapSize: 0.15,
-    });
-    const threshLine = new THREE.Line(threshGeo, threshMat);
-    threshLine.computeLineDistances();
-    scene.add(threshLine);
-
-    // --- 4. Shimmer 3D Particle Cloud ---
+    // Shimmer Particle Cloud
     const shimmerCount = 500;
     const shimmerGeo = new THREE.BufferGeometry();
     const shimmerPositions = new Float32Array(shimmerCount * 3);
     const shimmerColors = new Float32Array(shimmerCount * 3);
-
     for (let i = 0; i < shimmerCount; i++) {
-      // Cylindrical cloud on the left side
       const radius = 0.5 + Math.random() * 1.8;
       const angle = Math.random() * Math.PI * 2;
-      const height = (Math.random() - 0.5) * 4;
-
       shimmerPositions[i * 3] = -4.5 + radius * Math.cos(angle);
-      shimmerPositions[i * 3 + 1] = height;
+      shimmerPositions[i * 3 + 1] = (Math.random() - 0.5) * 4;
       shimmerPositions[i * 3 + 2] = radius * Math.sin(angle);
-
-      // Default green/cyan
       shimmerColors[i * 3] = 0.05;
       shimmerColors[i * 3 + 1] = 0.85;
       shimmerColors[i * 3 + 2] = 0.65;
     }
     shimmerGeo.setAttribute('position', new THREE.BufferAttribute(shimmerPositions, 3));
     shimmerGeo.setAttribute('color', new THREE.BufferAttribute(shimmerColors, 3));
-
-    const shimmerMat = new THREE.PointsMaterial({
-      size: 0.08,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.75,
-      blending: THREE.AdditiveBlending,
-    });
-    const shimmerParticles = new THREE.Points(shimmerGeo, shimmerMat);
+    const shimmerParticles = new THREE.Points(shimmerGeo, new THREE.PointsMaterial({ size: 0.09, vertexColors: true, transparent: true, opacity: 0.8 }));
     shimmerParticles.name = 'shimmerParticles';
-    scene.add(shimmerParticles);
+    bioGroup.add(shimmerParticles);
     shimmerParticlesRef.current = shimmerParticles;
 
-    // --- 5. Formant 3D Scatter Plot (Right Side) ---
+    // Formant 3D Scatter with Vowel Triangle
     const formantGroup = new THREE.Group();
     formantGroup.position.set(4.5, 0, 0);
+    const vTriangleGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.2, 1.5, -1.0),
+      new THREE.Vector3(1.2, 1.2, 1.0),
+      new THREE.Vector3(0, -1.5, 0.2),
+      new THREE.Vector3(-1.2, 1.5, -1.0),
+    ]);
+    formantGroup.add(new THREE.Line(vTriangleGeo, new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.65 })));
 
-    // Vowel triangle boundary wireframe
-    const vowelTriangleGeo = new THREE.BufferGeometry();
-    // Points corresponding to /i/, /u/, /a/ in normalized 3D space
-    const vI = new THREE.Vector3(-1.2, 1.5, -1.0); // high front /i/
-    const vU = new THREE.Vector3(1.2, 1.2, 1.0);   // high back /u/
-    const vA = new THREE.Vector3(0, -1.5, 0.2);    // low central /a/
-    vowelTriangleGeo.setFromPoints([vI, vU, vA, vI]);
-
-    const vowelTriangleMat = new THREE.LineBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.6,
-    });
-    const vowelTriangle = new THREE.Line(vowelTriangleGeo, vowelTriangleMat);
-    formantGroup.add(vowelTriangle);
-
-    // Vowel label markers (Spheres at vertices)
-    [
-      { pos: vI, label: '/i/ (300Hz, 2200Hz)', col: 0x38bdf8 },
-      { pos: vU, label: '/u/ (350Hz, 800Hz)', col: 0x10b981 },
-      { pos: vA, label: '/a/ (750Hz, 1200Hz)', col: 0xf59e0b },
-    ].forEach((pt) => {
-      const sGeo = new THREE.SphereGeometry(0.12, 16, 16);
-      const sMat = new THREE.MeshBasicMaterial({ color: pt.col });
-      const sMesh = new THREE.Mesh(sGeo, sMat);
-      sMesh.position.copy(pt.pos);
-      formantGroup.add(sMesh);
-    });
-
-    // Formant history points
-    const formantCount = 40;
     const formantGeo = new THREE.BufferGeometry();
-    const formantPositions = new Float32Array(formantCount * 3);
-    const formantColors = new Float32Array(formantCount * 3);
-
-    for (let i = 0; i < formantCount; i++) {
-      formantPositions[i * 3] = (Math.random() - 0.5) * 2;
-      formantPositions[i * 3 + 1] = (Math.random() - 0.5) * 2.5;
-      formantPositions[i * 3 + 2] = (Math.random() - 0.5) * 2;
-
-      // Color gradient by time
-      const hue = i / formantCount;
-      const c = new THREE.Color().setHSL(0.5 + hue * 0.4, 0.9, 0.6);
-      formantColors[i * 3] = c.r;
-      formantColors[i * 3 + 1] = c.g;
-      formantColors[i * 3 + 2] = c.b;
-    }
-    formantGeo.setAttribute('position', new THREE.BufferAttribute(formantPositions, 3));
-    formantGeo.setAttribute('color', new THREE.BufferAttribute(formantColors, 3));
-
-    const formantMat = new THREE.PointsMaterial({
-      size: 0.15,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.9,
-    });
-    const formantPoints = new THREE.Points(formantGeo, formantMat);
+    const formantPtsCount = 40;
+    formantGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(formantPtsCount * 3), 3));
+    formantGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(formantPtsCount * 3), 3));
+    const formantPoints = new THREE.Points(formantGeo, new THREE.PointsMaterial({ size: 0.16, vertexColors: true, transparent: true, opacity: 0.9 }));
     formantPoints.name = 'formantPoints';
     formantGroup.add(formantPoints);
     formantPointsRef.current = formantPoints;
+    bioGroup.add(formantGroup);
 
-    scene.add(formantGroup);
-
-    // --- 6. Breath-Formant Coupling Arcs ---
+    // Coupling Arcs
     const couplingGroup = new THREE.Group();
     for (let b = 0; b < 3; b++) {
-      const ringGeo = new THREE.TorusGeometry(3.0 + b * 0.4, 0.015, 12, 64);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x10b981,
-        transparent: true,
-        opacity: 0.25 + b * 0.1,
-      });
-      const rMesh = new THREE.Mesh(ringGeo, ringMat);
-      rMesh.rotation.x = Math.PI / 2;
-      couplingGroup.add(rMesh);
+      const cMesh = new THREE.Mesh(
+        new THREE.TorusGeometry(3.0 + b * 0.4, 0.015, 12, 64),
+        new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.25 + b * 0.1 })
+      );
+      cMesh.rotation.x = Math.PI / 2;
+      couplingGroup.add(cMesh);
     }
-    scene.add(couplingGroup);
+    bioGroup.add(couplingGroup);
     couplingRingsRef.current = couplingGroup;
 
-    // --- 7. Acoustic Challenge Shockwave ---
+    // Challenge Shockwave
     const shockGeo = new THREE.RingGeometry(0.1, 0.3, 64);
-    const shockMat = new THREE.MeshBasicMaterial({
-      color: 0x00f0ff,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0,
-    });
-    const shockwave = new THREE.Mesh(shockGeo, shockMat);
+    const shockwave = new THREE.Mesh(shockGeo, new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0 }));
     shockwave.rotation.x = Math.PI / 2;
-    scene.add(shockwave);
+    bioGroup.add(shockwave);
     shockwaveRef.current = shockwave;
 
-    // Raycasting / Mouse Interaction
+    scene.add(bioGroup);
+    biometricsGroupRef.current = bioGroup;
+
+    // ==========================================
+    // MODE 2: VOICE SIGNATURE DNA HELIX (Feature 1.7)
+    // ==========================================
+    const dnaGroup = new THREE.Group();
+    dnaGroup.name = 'dnaHelixGroup';
+    dnaGroup.visible = false;
+
+    const helixSteps = 80;
+    const strand1Points: THREE.Vector3[] = [];
+    const strand2Points: THREE.Vector3[] = [];
+
+    for (let i = 0; i < helixSteps; i++) {
+      const angle = (i / helixSteps) * Math.PI * 8;
+      const y = (i / helixSteps) * 8 - 4;
+      const radius = 1.4;
+      strand1Points.push(new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius));
+      strand2Points.push(new THREE.Vector3(Math.cos(angle + Math.PI) * radius, y, Math.sin(angle + Math.PI) * radius));
+
+      // Connecting rungs every 4 steps
+      if (i % 4 === 0) {
+        const rungGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius),
+          new THREE.Vector3(Math.cos(angle + Math.PI) * radius, y, Math.sin(angle + Math.PI) * radius),
+        ]);
+        const rungLine = new THREE.Line(rungGeo, new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.5 }));
+        dnaGroup.add(rungLine);
+      }
+    }
+
+    const strand1Geo = new THREE.BufferGeometry().setFromPoints(strand1Points);
+    const strand1 = new THREE.Line(strand1Geo, new THREE.LineBasicMaterial({ color: 0x00f0ff, linewidth: 3 }));
+    dnaGroup.add(strand1);
+
+    const strand2Geo = new THREE.BufferGeometry().setFromPoints(strand2Points);
+    const strand2 = new THREE.Line(strand2Geo, new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 3 }));
+    dnaGroup.add(strand2);
+
+    scene.add(dnaGroup);
+    dnaHelixGroupRef.current = dnaGroup;
+
+    // ==========================================
+    // MODE 3: FREQUENCY HEATMAP 3D TOWER (Feature 1.4)
+    // ==========================================
+    const towerGroup = new THREE.Group();
+    towerGroup.name = 'freqTowerGroup';
+    towerGroup.visible = false;
+
+    const towerBars = 32;
+    for (let tb = 0; tb < towerBars; tb++) {
+      const barGeo = new THREE.BoxGeometry(0.22, 1, 0.22);
+      const barMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color().setHSL(0.6 - (tb / towerBars) * 0.6, 0.9, 0.55),
+        emissive: 0x002244,
+        roughness: 0.3,
+      });
+      const barMesh = new THREE.Mesh(barGeo, barMat);
+      barMesh.position.set((tb / towerBars) * 8 - 4, 0, 0);
+      barMesh.name = `freqBar_${tb}`;
+      towerGroup.add(barMesh);
+    }
+    scene.add(towerGroup);
+    freqTowerGroupRef.current = towerGroup;
+
+    // ==========================================
+    // MODE 4: 3D CALL NETWORK GRAPH (FRAUD RING) (Feature 2.3)
+    // ==========================================
+    const fraudRingGroup = new THREE.Group();
+    fraudRingGroup.name = 'fraudRingGroup';
+    fraudRingGroup.visible = false;
+
+    // Nodes
+    const networkNodes = [
+      { pos: new THREE.Vector3(0, 0, 0), isRingleader: true, label: 'SUSPECTED RINGLEADER (Spoofed Trunk)' },
+      { pos: new THREE.Vector3(-3.2, 1.8, -1.5), isRingleader: false, label: 'Caller #1 (Mumbai, 4G)' },
+      { pos: new THREE.Vector3(-2.8, -1.5, 1.2), isRingleader: false, label: 'Caller #2 (Delhi, Fiber)' },
+      { pos: new THREE.Vector3(3.0, 2.0, 1.0), isRingleader: false, label: 'Caller #3 (Ahmedabad, SIP)' },
+      { pos: new THREE.Vector3(3.5, -1.8, -1.0), isRingleader: false, label: 'Caller #4 (Tor Exit Relay)' },
+      { pos: new THREE.Vector3(0, 3.2, -2.5), isRingleader: false, label: 'Caller #5 (Bengaluru)' },
+    ];
+
+    networkNodes.forEach((node) => {
+      const nGeo = new THREE.SphereGeometry(node.isRingleader ? 0.6 : 0.3, 24, 24);
+      const nMat = new THREE.MeshStandardMaterial({
+        color: node.isRingleader ? 0xef4444 : 0xfacc15,
+        emissive: node.isRingleader ? 0xef4444 : 0xb45309,
+        emissiveIntensity: 0.7,
+      });
+      const nMesh = new THREE.Mesh(nGeo, nMat);
+      nMesh.position.copy(node.pos);
+      fraudRingGroup.add(nMesh);
+
+      // Connecting edge to center ringleader
+      if (!node.isRingleader) {
+        const edgeGeo = new THREE.BufferGeometry().setFromPoints([networkNodes[0].pos, node.pos]);
+        const edgeLine = new THREE.Line(edgeGeo, new THREE.LineBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.6 }));
+        fraudRingGroup.add(edgeLine);
+      }
+    });
+    scene.add(fraudRingGroup);
+    fraudRingGroupRef.current = fraudRingGroup;
+
+    // ==========================================
+    // MODE 5: NEURAL NETWORK CONFIDENCE FLOW (Feature 1.5)
+    // ==========================================
+    const neuralGroup = new THREE.Group();
+    neuralGroup.name = 'neuralNetGroup';
+    neuralGroup.visible = false;
+
+    // Layers: Input (4 nodes), Hidden (6 nodes), Decision Node (1 node)
+    const layer1 = [-2, -0.7, 0.7, 2].map((y) => new THREE.Vector3(-4, y, 0));
+    const layer2 = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5].map((y) => new THREE.Vector3(0, y, (Math.random() - 0.5) * 1.5));
+    const decisionNodePos = new THREE.Vector3(4, 0, 0);
+
+    // Nodes creation
+    [...layer1, ...layer2, decisionNodePos].forEach((pos, idx) => {
+      const isDecision = idx === layer1.length + layer2.length;
+      const nodeGeo = new THREE.SphereGeometry(isDecision ? 0.55 : 0.22, 16, 16);
+      const nodeMat = new THREE.MeshStandardMaterial({
+        color: isDecision ? 0x10b981 : 0x00f0ff,
+        emissive: isDecision ? 0x10b981 : 0x0088cc,
+        emissiveIntensity: 0.8,
+      });
+      const nMesh = new THREE.Mesh(nodeGeo, nodeMat);
+      nMesh.position.copy(pos);
+      neuralGroup.add(nMesh);
+    });
+
+    // Connections Layer 1 to Layer 2
+    layer1.forEach((p1) => {
+      layer2.forEach((p2) => {
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.2 });
+        neuralGroup.add(new THREE.Line(lineGeo, lineMat));
+      });
+    });
+
+    // Connections Layer 2 to Decision Node
+    layer2.forEach((p2) => {
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([p2, decisionNodePos]);
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.35 });
+      neuralGroup.add(new THREE.Line(lineGeo, lineMat));
+    });
+
+    scene.add(neuralGroup);
+    neuralNetGroupRef.current = neuralGroup;
+
+    // Mouse events
+    const raycaster = new THREE.Raycaster();
+    const mousePos = new THREE.Vector2();
+
     const handleMouseMove = (event: MouseEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
-      mousePosRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mousePosRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      mousePos.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mousePos.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       setTooltipPos({ x: event.clientX, y: event.clientY });
-    };
-
-    const handleDblClick = () => {
-      onPresetChange(1);
     };
 
     const canvasDom = renderer.domElement;
     canvasDom.addEventListener('mousemove', handleMouseMove);
-    canvasDom.addEventListener('dblclick', handleDblClick);
 
-    // Resize Handler
+    // Resize
     const handleResize = () => {
       if (!container || !renderer || !camera) return;
       const w = container.clientWidth;
@@ -403,101 +485,82 @@ export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
       const delta = clock.getDelta();
       const elapsedTime = clock.getElapsedTime() * (settings.animationSpeed / 100);
 
-      // Smooth camera transition to target preset
       camera.position.lerp(targetCameraPos.current, 0.05);
       controls.target.lerp(targetLookAt.current, 0.05);
       controls.update();
 
-      // Rotate Risk Rings
-      if (outerRing1Ref.current) {
-        outerRing1Ref.current.rotation.z += delta * 0.6;
-        outerRing1Ref.current.rotation.x += delta * 0.2;
-      }
-      if (outerRing2Ref.current) {
-        outerRing2Ref.current.rotation.y += delta * 0.4;
-        outerRing2Ref.current.rotation.z -= delta * 0.3;
+      // Threat Dome slow rotation
+      if (threatDomeRef.current) {
+        threatDomeRef.current.rotation.y += delta * 0.05;
       }
 
-      // Pulse Core
-      if (riskCoreRef.current) {
-        const pulse = 1.0 + Math.sin(elapsedTime * 4.0) * 0.08;
-        riskCoreRef.current.scale.set(pulse, pulse, pulse);
+      // Ripples pulsation
+      if (ripplesGroupRef.current) {
+        ripplesGroupRef.current.children.forEach((rMesh, i) => {
+          const s = 1.0 + Math.sin(elapsedTime * 2.0 + i) * 0.15;
+          rMesh.scale.set(s, s, 1);
+        });
       }
 
-      // Shimmer Particle Cloud oscillation
-      if (shimmerParticlesRef.current) {
-        const posAttr = shimmerParticlesRef.current.geometry.attributes.position as THREE.BufferAttribute;
-        const colAttr = shimmerParticlesRef.current.geometry.attributes.color as THREE.BufferAttribute;
-        const positions = posAttr.array as Float32Array;
-        const colors = colAttr.array as Float32Array;
-        const isHighShimmer = currentMetrics.shimmer > 3.5;
-
-        for (let i = 0; i < shimmerCount; i++) {
-          const idx = i * 3;
-          // Agitation speed
-          const speed = isHighShimmer ? 2.5 : 0.8;
-          positions[idx + 1] += Math.sin(elapsedTime * speed + i) * 0.008;
-
-          // Color transition
-          if (isHighShimmer) {
-            colors[idx] = THREE.MathUtils.lerp(colors[idx], 0.95, 0.05);     // Red
-            colors[idx + 1] = THREE.MathUtils.lerp(colors[idx + 1], 0.2, 0.05);
-            colors[idx + 2] = THREE.MathUtils.lerp(colors[idx + 2], 0.2, 0.05);
+      // Biometrics mode animations
+      if (biometricsGroupRef.current?.visible) {
+        if (outerRing1Ref.current) {
+          outerRing1Ref.current.rotation.z += delta * 0.6;
+          outerRing1Ref.current.rotation.x += delta * 0.2;
+        }
+        if (outerRing2Ref.current) {
+          outerRing2Ref.current.rotation.y += delta * 0.4;
+          outerRing2Ref.current.rotation.z -= delta * 0.3;
+        }
+        if (riskCoreRef.current) {
+          const pulse = 1.0 + Math.sin(elapsedTime * 4.0) * 0.08;
+          riskCoreRef.current.scale.set(pulse, pulse, pulse);
+        }
+        if (formantPointsRef.current) {
+          formantPointsRef.current.rotation.y = elapsedTime * 0.15;
+        }
+        if (couplingRingsRef.current) {
+          const cScore = currentMetrics.couplingScore;
+          const s = 1.0 + Math.sin(elapsedTime * (1.5 + cScore * 3.5)) * (0.04 + cScore * 0.08);
+          couplingRingsRef.current.scale.set(s, 1, s);
+        }
+        if (shockwaveRef.current) {
+          if (isChallengeActive) {
+            const radius = 0.5 + challengeProgress * 7.5;
+            shockwaveRef.current.scale.set(radius, radius, 1);
+            (shockwaveRef.current.material as THREE.MeshBasicMaterial).opacity = (1 - challengeProgress) * 0.9;
           } else {
-            colors[idx] = THREE.MathUtils.lerp(colors[idx], 0.05, 0.05);
-            colors[idx + 1] = THREE.MathUtils.lerp(colors[idx + 1], 0.85, 0.05); // Green
-            colors[idx + 2] = THREE.MathUtils.lerp(colors[idx + 2], 0.65, 0.05);
+            (shockwaveRef.current.material as THREE.MeshBasicMaterial).opacity = 0;
           }
         }
-        posAttr.needsUpdate = true;
-        colAttr.needsUpdate = true;
       }
 
-      // Formant Point Animation
-      if (formantPointsRef.current) {
-        formantPointsRef.current.rotation.y = elapsedTime * 0.15;
+      // DNA Helix animation
+      if (dnaHelixGroupRef.current?.visible) {
+        dnaHelixGroupRef.current.rotation.y += delta * 0.8;
       }
 
-      // Breath coupling rings pulse
-      if (couplingRingsRef.current) {
-        const cScore = currentMetrics.couplingScore;
-        const pulseSpeed = 1.5 + cScore * 3.5;
-        const s = 1.0 + Math.sin(elapsedTime * pulseSpeed) * (0.04 + cScore * 0.08);
-        couplingRingsRef.current.scale.set(s, 1, s);
+      // Frequency Tower animation
+      if (freqTowerGroupRef.current?.visible) {
+        freqTowerGroupRef.current.rotation.y += delta * 0.25;
+        freqTowerGroupRef.current.children.forEach((bMesh, idx) => {
+          if (bMesh instanceof THREE.Mesh) {
+            const h = 0.5 + Math.abs(Math.sin(elapsedTime * 3.0 + idx * 0.4)) * 3.5;
+            bMesh.scale.set(1, h, 1);
+            bMesh.position.y = h / 2 - 2.0;
+          }
+        });
       }
 
-      // Challenge Shockwave animation
-      if (shockwaveRef.current) {
-        if (isChallengeActive) {
-          const radius = 0.5 + challengeProgress * 7.5;
-          shockwaveRef.current.scale.set(radius, radius, 1);
-          (shockwaveRef.current.material as THREE.MeshBasicMaterial).opacity = (1 - challengeProgress) * 0.9;
-        } else {
-          (shockwaveRef.current.material as THREE.MeshBasicMaterial).opacity = 0;
-        }
+      // Fraud Ring animation
+      if (fraudRingGroupRef.current?.visible) {
+        fraudRingGroupRef.current.rotation.y += delta * 0.3;
       }
 
-      // Raycasting hover check
-      raycasterRef.current.setFromCamera(mousePosRef.current, camera);
-      const intersects = raycasterRef.current.intersectObjects(scene.children, true);
-
-      let foundInfo: string | null = null;
-      for (const hit of intersects) {
-        if (hit.object.name === 'jitterLine') {
-          foundInfo = `Jitter Ribbon: Frequency variation ${currentMetrics.jitter.toFixed(2)}%`;
-          break;
-        } else if (hit.object.name === 'shimmerParticles') {
-          foundInfo = `Shimmer Particle Cloud: Amplitude variation ${currentMetrics.shimmer.toFixed(2)} dB (${currentMetrics.shimmer > 3.5 ? 'Dense Alert' : 'Sparse Natural'})`;
-          break;
-        } else if (hit.object.name === 'formantPoints') {
-          foundInfo = `Formant Resonances: F1=${currentMetrics.f1}Hz, F2=${currentMetrics.f2}Hz, F3=${currentMetrics.f3}Hz (${currentMetrics.vowelZone})`;
-          break;
-        } else if (hit.object.name === 'riskCore' || hit.object.parent?.name === 'riskGroup') {
-          foundInfo = `Central Risk Meter: ${currentMetrics.riskScore}% Threat Level (${currentMetrics.riskScore > 60 ? 'HIGH RISK' : currentMetrics.riskScore > 40 ? 'MEDIUM RISK' : 'SAFE'})`;
-          break;
-        }
+      // Neural Net animation
+      if (neuralNetGroupRef.current?.visible) {
+        neuralNetGroupRef.current.rotation.y = Math.sin(elapsedTime * 0.5) * 0.2;
       }
-      setHoveredInfo(foundInfo);
 
       renderer.render(scene, camera);
     };
@@ -508,7 +571,6 @@ export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
       canvasDom.removeEventListener('mousemove', handleMouseMove);
-      canvasDom.removeEventListener('dblclick', handleDblClick);
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
@@ -516,12 +578,20 @@ export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
     };
   }, [settings.quality3D, settings.theme]);
 
-  // Update Dynamic Metrics Colors and Geometry
+  // Update Dynamic Biometrics
   useEffect(() => {
     if (!sceneRef.current) return;
 
-    // Update Central Risk Core Color
     const riskColor = getRiskColor(currentMetrics.riskScore);
+
+    // Threat Dome color transition
+    if (threatDomeRef.current) {
+      (threatDomeRef.current.material as THREE.MeshBasicMaterial).color = riskColor;
+      (threatDomeRef.current.material as THREE.MeshBasicMaterial).opacity =
+        currentMetrics.riskScore > 80 ? 0.35 : 0.12;
+    }
+
+    // Central Core
     if (riskCoreRef.current) {
       const mat = riskCoreRef.current.material as THREE.MeshStandardMaterial;
       mat.color = riskColor;
@@ -532,156 +602,103 @@ export const VoiceGuardScene3D: React.FC<VoiceGuardScene3DProps> = ({
       (outerRing1Ref.current.material as THREE.MeshStandardMaterial).color = riskColor;
     }
 
-    // Update Jitter Waveform Geometry from History
+    // Jitter Waveform
     if (jitterLineRef.current && history.length > 2) {
       const posAttr = jitterLineRef.current.geometry.attributes.position as THREE.BufferAttribute;
       const positions = posAttr.array as Float32Array;
       const maxPts = Math.min(60, positions.length / 3);
-
-      const recentHistory = history.slice(-maxPts);
+      const recent = history.slice(-maxPts);
       for (let i = 0; i < maxPts; i++) {
-        const dataPoint = recentHistory[i] || currentMetrics;
-        const t = (i / maxPts) * 10 - 5;
-        positions[i * 3] = t;
-        // Jitter height normalized
-        const height = (dataPoint.jitter / 5.0) * 1.5;
-        positions[i * 3 + 1] = -1.8 + height;
+        const pt = recent[i] || currentMetrics;
+        positions[i * 3] = (i / maxPts) * 10 - 5;
+        positions[i * 3 + 1] = -1.8 + (pt.jitter / 5.0) * 1.5;
         positions[i * 3 + 2] = 2.0;
       }
       posAttr.needsUpdate = true;
-
-      // Line color
-      const jitterColor = currentMetrics.jitter > 3.5 ? 0xef4444 : currentMetrics.jitter > 2.4 ? 0xfacc15 : 0x10b981;
-      (jitterLineRef.current.material as THREE.LineBasicMaterial).color.setHex(jitterColor);
+      (jitterLineRef.current.material as THREE.LineBasicMaterial).color.setHex(
+        currentMetrics.jitter > 3.5 ? 0xef4444 : currentMetrics.jitter > 2.4 ? 0xfacc15 : 0x10b981
+      );
     }
 
-    // Update Formant 3D Scatter Points
+    // Formant Points
     if (formantPointsRef.current && history.length > 2) {
       const posAttr = formantPointsRef.current.geometry.attributes.position as THREE.BufferAttribute;
       const colAttr = formantPointsRef.current.geometry.attributes.color as THREE.BufferAttribute;
       const positions = posAttr.array as Float32Array;
       const colors = colAttr.array as Float32Array;
       const ptCount = Math.min(40, positions.length / 3);
-
       const recent = history.slice(-ptCount);
       for (let i = 0; i < ptCount; i++) {
         const pt = recent[i] || currentMetrics;
-        // Normalize F1 (300-800) to [-1.5, 1.5]
-        const normF1 = ((pt.f1 - 550) / 250) * 1.5;
-        // Normalize F2 (600-2500) to [-1.5, 1.5]
-        const normF2 = ((pt.f2 - 1550) / 950) * 1.5;
-        // Normalize F3 (1200-3500) to [-1.5, 1.5]
-        const normF3 = ((pt.f3 - 2350) / 1150) * 1.5;
-
-        positions[i * 3] = normF1;
-        positions[i * 3 + 1] = normF2;
-        positions[i * 3 + 2] = normF3;
-
-        // Color based on time progression & anomaly
-        const isAnomaly = pt.vowelZone === 'outlier';
-        if (isAnomaly) {
-          colors[i * 3] = 0.95;
-          colors[i * 3 + 1] = 0.15;
-          colors[i * 3 + 2] = 0.25;
-        } else {
-          const ratio = i / ptCount;
-          const col = new THREE.Color().setHSL(0.5 + ratio * 0.35, 0.9, 0.6);
-          colors[i * 3] = col.r;
-          colors[i * 3 + 1] = col.g;
-          colors[i * 3 + 2] = col.b;
-        }
+        positions[i * 3] = ((pt.f1 - 550) / 250) * 1.5;
+        positions[i * 3 + 1] = ((pt.f2 - 1550) / 950) * 1.5;
+        positions[i * 3 + 2] = ((pt.f3 - 2350) / 1150) * 1.5;
+        const col = pt.vowelZone === 'outlier' ? new THREE.Color(0xef4444) : new THREE.Color(0x00f0ff);
+        colors[i * 3] = col.r;
+        colors[i * 3 + 1] = col.g;
+        colors[i * 3 + 2] = col.b;
       }
       posAttr.needsUpdate = true;
       colAttr.needsUpdate = true;
     }
-
-    // Update Coupling Rings Color
-    if (couplingRingsRef.current) {
-      const cScore = currentMetrics.couplingScore;
-      const cColor = cScore >= 0.8 ? 0x10b981 : cScore >= 0.4 ? 0xfacc15 : 0xef4444;
-      couplingRingsRef.current.children.forEach((child) => {
-        if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
-          child.material.color.setHex(cColor);
-        }
-      });
-    }
   }, [currentMetrics, history]);
 
-  // Click on 3D canvas
-  const handleCanvasClick = useCallback(() => {
-    if (hoveredInfo) {
-      if (hoveredInfo.includes('Jitter')) {
-        onMetricSelect?.('jitter');
-      } else if (hoveredInfo.includes('Shimmer')) {
-        onMetricSelect?.('shimmer');
-      } else if (hoveredInfo.includes('Formant')) {
-        onMetricSelect?.('formants');
-        // Play acoustic resonant tone of current formant
-        audioSynth.playFormantTone(currentMetrics.f1, currentMetrics.f2, currentMetrics.f3);
-      } else if (hoveredInfo.includes('Risk')) {
-        onMetricSelect?.('risk');
-      }
-    }
-  }, [hoveredInfo, currentMetrics, onMetricSelect]);
-
   return (
-    <div className="relative w-full h-full overflow-hidden select-none" ref={containerRef} onClick={handleCanvasClick}>
-      {/* 3D Scene Controls Overlay (Top-Left of 3D Canvas) */}
-      <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-1.5 bg-slate-950/80 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-700/60 shadow-xl text-xs font-mono">
-        <span className="text-slate-400 font-medium mr-1.5 flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-          VIEW:
+    <div className="relative w-full h-full overflow-hidden select-none" ref={containerRef}>
+      {/* 3D Mode Selector Header Bar (Section 1 Unique Modes) */}
+      <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-1.5 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/60 shadow-xl text-xs font-mono">
+        <span className="text-cyan-400 font-bold mr-1 flex items-center gap-1">
+          <Eye className="w-3.5 h-3.5 animate-pulse text-cyan-400" />
+          MODE:
         </span>
         {[
-          { key: 1, label: '[1] Front', title: 'Front View (Default)' },
-          { key: 2, label: '[2] Top', title: 'Top View (Overview)' },
-          { key: 3, label: '[3] Side', title: 'Side View (Timeline)' },
-          { key: 4, label: '[4] Free', title: 'Free Look (Exploration)' },
-          { key: 5, label: '[5] Focus', title: 'Call Focus (Zoom)' },
-        ].map((item) => (
+          { id: 'biometrics', label: 'Vocal Hologram', icon: Shield },
+          { id: 'dna-helix', label: 'Voice DNA Helix', icon: Dna },
+          { id: 'frequency-tower', label: '3D Freq Tower', icon: BarChart3 },
+          { id: 'neural-network', label: 'Neural AI Flow', icon: Network },
+          { id: 'fraud-ring', label: 'Fraud Ring Graph', icon: Share2 },
+        ].map((m) => {
+          const Icon = m.icon;
+          return (
+            <button
+              key={m.id}
+              onClick={() => onModeChange(m.id as Visualization3DMode)}
+              className={`px-2.5 py-1 rounded-lg transition-all font-semibold flex items-center gap-1.5 ${
+                active3DMode === m.id
+                  ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/60 shadow-md shadow-cyan-500/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{m.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Preset Camera Views (Bottom Left) */}
+      <div className="absolute bottom-4 left-4 z-10 flex flex-wrap items-center gap-1.5 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/60 shadow-xl text-xs font-mono">
+        <span className="text-slate-400 font-medium mr-1">CAMERA:</span>
+        {[
+          { key: 1, label: '[1] Front' },
+          { key: 2, label: '[2] Top' },
+          { key: 3, label: '[3] Side' },
+          { key: 4, label: '[4] Free' },
+          { key: 5, label: '[5] Focus' },
+        ].map((p) => (
           <button
-            key={item.key}
-            onClick={(e) => {
-              e.stopPropagation();
-              onPresetChange(item.key as CameraPreset);
-            }}
-            title={item.title}
-            className={`px-2.5 py-1 rounded-lg transition-all font-semibold ${
-              cameraPreset === item.key
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-sm shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            key={p.key}
+            onClick={() => onPresetChange(p.key as CameraPreset)}
+            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+              cameraPreset === p.key
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
-            {item.label}
+            {p.label}
           </button>
         ))}
       </div>
-
-      {/* Navigation Help Badge (Bottom-Left) */}
-      <div className="absolute bottom-4 left-4 z-10 hidden sm:flex items-center gap-3 bg-slate-950/70 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800 text-[11px] text-slate-400 font-mono">
-        <span>🖱️ Left Drag: Rotate</span>
-        <span>•</span>
-        <span>Scroll: Zoom</span>
-        <span>•</span>
-        <span>Right Drag: Pan</span>
-        <span>•</span>
-        <span>2x Click: Reset</span>
-      </div>
-
-      {/* 3D Raycasting Tooltip */}
-      {hoveredInfo && (
-        <div
-          className="absolute z-30 pointer-events-none bg-slate-900/95 backdrop-blur-md text-cyan-300 px-3 py-2 rounded-lg border border-cyan-500/40 shadow-2xl text-xs font-mono max-w-xs transition-opacity transform -translate-x-1/2 -translate-y-12"
-          style={{ left: tooltipPos.x, top: tooltipPos.y }}
-        >
-          <div className="flex items-center gap-1.5 font-bold mb-0.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-            <span>3D Vocal Biometric Element</span>
-          </div>
-          <div className="text-slate-200">{hoveredInfo}</div>
-          <div className="text-[10px] text-slate-400 mt-1">Click to drill down & inspect • Shift+Click to compare</div>
-        </div>
-      )}
     </div>
   );
 };
