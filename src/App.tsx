@@ -19,6 +19,7 @@ import { UserGuideModal } from './components/modals/UserGuideModal';
 import { KnowledgeQuestionsModal } from './components/modals/KnowledgeQuestionsModal';
 import { GamificationModal } from './components/modals/GamificationModal';
 import { BharatMindModal } from './components/modals/BharatMindModal';
+import { TeamModal } from './components/modals/TeamModal';
 import { BharatMindInferenceResult } from './services/ai/BharatMindAgent';
 import { ContextMenu } from './components/modals/ContextMenu';
 import { AppSettings, CameraPreset, ContextMenuState, Visualization3DMode } from './types';
@@ -58,6 +59,7 @@ export const App: React.FC = () => {
   const [isKnowledgeOpen, setIsKnowledgeOpen] = useState<boolean>(false);
   const [isGamificationOpen, setIsGamificationOpen] = useState<boolean>(false);
   const [isBharatMindOpen, setIsBharatMindOpen] = useState<boolean>(false);
+  const [isTeamOpen, setIsTeamOpen] = useState<boolean>(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     x: 0,
     y: 0,
@@ -236,6 +238,7 @@ export const App: React.FC = () => {
       if (keyLower === 'r') { toggleRecord(); return; }
       if (keyLower === 'd') { setSettings((prev) => ({ ...prev, theme: prev.theme === 'dark' ? 'light' : 'dark' })); return; }
       if (keyLower === 'f') { toggleFullscreen(); return; }
+      if (keyLower === 't') { setIsTeamOpen(prev => !prev); return; }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -261,6 +264,7 @@ export const App: React.FC = () => {
         onOpenGuide={() => setIsGuideOpen(true)}
         onOpenGamification={() => setIsGamificationOpen(true)}
         onOpenBharatMind={() => setIsBharatMindOpen(true)}
+        onOpenTeam={() => setIsTeamOpen(true)}
         onToggleFullscreen={toggleFullscreen}
       />
 
@@ -542,6 +546,11 @@ export const App: React.FC = () => {
       <GamificationModal
         isOpen={isGamificationOpen}
         onClose={() => setIsGamificationOpen(false)}
+      />
+
+      <TeamModal
+        isOpen={isTeamOpen}
+        onClose={() => setIsTeamOpen(false)}
       />
 
       <BharatMindModal

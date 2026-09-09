@@ -12,6 +12,7 @@ import {
   BookOpen,
   Trophy,
   Bot,
+  Users,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -25,6 +26,7 @@ interface HeaderProps {
   onOpenGuide: () => void;
   onOpenGamification: () => void;
   onOpenBharatMind?: () => void;
+  onOpenTeam?: () => void;
   onToggleFullscreen: () => void;
 }
 
@@ -38,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenGuide,
   onOpenGamification,
   onOpenBharatMind,
+  onOpenTeam,
   onToggleFullscreen,
 }) => {
   const formatDuration = (sec: number) => {
@@ -190,6 +193,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Bot className="w-4 h-4 text-cyan-200 animate-pulse" />
               <span className="hidden sm:inline">BharatMind AI</span>
+            </button>
+          )}
+
+          {onOpenTeam && (
+            <button
+              onClick={onOpenTeam}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 text-xs font-bold font-mono flex items-center gap-1.5 shadow-md transition-all"
+              title="View Project Team Members (Ashwin M, G Mahitha Reddy, Kanimozhi A)"
+            >
+              <Users className="w-4 h-4 text-amber-400" />
+              <span>TEAMS</span>
             </button>
           )}
 
